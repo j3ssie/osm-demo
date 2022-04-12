@@ -1,7 +1,6 @@
-# Demo workflows + inputs 
+## Demo workflows + inputs 
 
-
-Please read more documentation at [https://docs.osmedeus.org/](https://docs.osmedeus.org/)
+Please read more documentation at [📖 https://docs.osmedeus.org/](https://docs.osmedeus.org/)
 
 ```shell
 
@@ -15,4 +14,6 @@ osmedeus scan -m content-discovery.yaml -t inputs-urls
 osmedeus scan -f sample-workflow -t inputs-host-only
 ```
 
+## 📚 [The Slide can be found here](https://docs.google.com/presentation/d/1Mu6JqzIpLiPbwXtPraFJRNBCAu5OXZn4SMIcl8hvMWI/edit?usp=sharing)
 
+## 🎥 [The recorded video can be found here](https://youtu.be/ohi0fsLTesw)
