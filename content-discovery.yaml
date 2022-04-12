@@ -1,0 +1,45 @@
+name: content-discovery
+desc: Run dirbscan scan on list of HTTP file
+
+report:
+  final:
+    - "{{.Output}}/directory/beautify-{{.Workspace}}.txt"
+
+params:
+  - httpFile: "{{.Target}}"
+  - wordlists: "{{.Data}}/wordlists/content/small.txt"
+  - lines: "20"
+  - ffThreads: '30' # threads for single site
+  - dirbThreads: '15'
+  - dlimit: '50000'
+  - recursion: '0'
+
+pre_run:
+  - CreateFolder("{{.Output}}/directory")
+
+steps:
+  - required:
+      - "{{.Binaries}}/ffuf-mod" # this is a special ffuf which made by my friend @thebl4ckturtle
+      - "{{.httpFile}}"
+    source: "{{.httpFile}}"
+    threads: '{{.dirbThreads}}' # how many parallel ffuf can be run at the same time
+    commands:
+      - "{{.Binaries}}/ffuf-mod -H 'X-Forwarded-For: 127.0.0.1' -t {{.ffThreads}} -recursion-depth {{.recursion}} -D -e 'asp,aspx,php,html,htm,jsp,cgi' -timeout 15 -get-hash -ac -s -fc '429,404,400' -of json -o {{.Output}}/directory/raw-{{._id_}}.json -u '{{.line}}/FUZZ' -w {{.wordlists}}:FUZZ > /dev/null 2>&1"
+    scripts:
+      - ExecCmd("cat {{.Output}}/directory/raw-{{._id_}}.json | {{.Binaries}}/junique -k 'hash' | sort -u > {{.Output}}/directory/unique-{{._id_}}.json")
+      # get interesting result by unique the result
+      - ExecCmd("cat {{.Output}}/directory/unique-{{._id_}}.json | jq -r '[.url,(.status|tostring),(.length|tostring),(.words|tostring),(.lines|tostring),.hash,.redirectlocation] | join(\",\")' > {{.Output}}/directory/raw-{{._id_}}-{{.Workspace}}.csv")
+      - ExecCmd("cat {{.Output}}/directory/raw-{{._id_}}-{{.Workspace}}.csv | {{.Binaries}}/csvtk cut -f 1,2,3,4,5,7 -I | {{.Binaries}}/csvtk uniq -f 4 -I | {{.Binaries}}/csvtk pretty -I -s ' | ' -W 75 > {{.Output}}/directory/beautify-{{._id_}}-{{.Workspace}}.txt")
+      # generate beautify output
+      - ExecCmd("cat {{.Output}}/directory/raw-{{._id_}}-{{.Workspace}}.csv >> {{.Output}}/directory/beautify-{{.Workspace}}.csv")
+      # unique result
+      - SortU("{{.Output}}/directory/beautify-{{.Workspace}}.csv")
+      # clean up
+      - ExecCmd("rm -rf {{.Output}}/directory/beautify-{{._id_}}-{{.Workspace}}.txt {{.Output}}/directory/raw-{{._id_}}-{{.Workspace}}.csv {{.Output}}/directory/raw-{{._id_}}.json {{.Output}}/directory/unique-{{._id_}}.json")
+
+  # unique all the thing again
+  - required:
+      - "{{.Output}}/directory/beautify-{{.Workspace}}.csv"
+    scripts:
+      - ExecCmd("cat {{.Output}}/directory/beautify-{{.Workspace}}.csv | {{.Binaries}}/csvtk cut -f 1,2,3,4,5,7 -I | {{.Binaries}}/csvtk uniq -f 4 -I | {{.Binaries}}/csvtk pretty -I -s ' | ' -W 75 > {{.Output}}/directory/beautify-{{.Workspace}}.txt")
+      - Cat("{{.Output}}/directory/beautify-{{.Workspace}}.txt")

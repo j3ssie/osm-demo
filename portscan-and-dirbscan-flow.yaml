@@ -1,0 +1,10 @@
+name: portscan-and-dirbscan-flow
+desc: run portscan and dirbscan on list of ip addersses
+type: sample-flow # this mean modules will be loaded from sample-flow/module-name.yaml
+validator: ip-file
+
+routines:
+  - modules:
+      - portscan # this module will loaded from sample-flow/portscan.yaml
+  - modules:
+      - dirbscan
