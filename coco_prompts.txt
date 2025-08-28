@@ -1,0 +1,283 @@
+# Osmedeus Demo Workflows - Complete Instructions and Tools Reference
+
+## Overview
+This repository contains demo workflows and inputs for the Osmedeus security scanning framework. All workflows are designed to perform various security assessments including vulnerability scanning, content discovery, and port scanning.
+
+Documentation: https://docs.osmedeus.org/
+Slide: https://docs.google.com/presentation/d/1Mu6JqzIpLiPbwXtPraFJRNBCAu5OXZn4SMIcl8hvMWI/edit?usp=sharing
+Video: https://youtu.be/ohi0fsLTesw
+
+## Usage Examples
+
+### Basic Command Structure
+```shell
+# Basic scan command format
+osmedeus scan -m <workflow-file.yaml> -t <input-file>
+
+# With custom parameters
+osmedeus scan -m <workflow-file.yaml> -t <input-file> -p 'param=value'
+
+# Using workflow flows
+osmedeus scan -f <sample-workflow> -t <input-file>
+```
+
+### Practical Examples
+```shell
+# Running Jaeles and Nuclei scan on the list of IP addresses with ports
+osmedeus scan -m vulnerability-scan.yaml -t inputs-host-with-port
+
+# Running ffuf with filtered content discovery
+osmedeus scan -m content-discovery.yaml -t inputs-urls
+
+# Complete flow: portscan -> vulnscan -> dirbscan
+osmedeus scan -f sample-workflow -t inputs-host-only
+
+# Custom parameters for vulnerability scan
+osmedeus scan -m vulnerability-scan.yaml -t inputs-host-with-port -p 'jaelesThreads=200' -p 'nucleiThreads=300'
+```
+
+## Workflows and Sections
+
+### 1. Vulnerability Scan Workflow (vulnerability-scan.yaml)
+
+**Description:** Run common vulnerability scans on list of HTTP targets
+**Tools Used:**
+- httprobe - HTTP probing tool
+- jaeles - Web application vulnerability scanner
+- nuclei - Fast and customizable vulnerability scanner
+- jq - JSON processor
+
+**Sections:**
+- **name:** vulnerability-scan
+- **desc:** Run common Vulnerability scan on list of HTTP file
+- **report:** Generated HTML and text reports
+- **params:** Configuration parameters including threads, signatures, limits
+- **pre_run:** Folder creation for outputs
+- **steps:** Multi-step execution flow
+
+**Key Parameters:**
+- jaelesThreads: 100 (concurrent threads for Jaeles)
+- nucleiThreads: 200 (concurrent threads for Nuclei)
+- limit: 100000 (scan limit)
+- sign: ~/.jaeles/base-signatures/products/.* (Jaeles signatures path)
+- sign2: ~/.jaeles/base-signatures/sensitive/.* (Sensitive signatures)
+
+**Generated Reports:**
+- {{.Output}}/vuln/active/{{.Workspace}}-report.html
+- {{.Output}}/vuln/sensitive/{{.Workspace}}-sensitive.html
+- {{.Output}}/vuln/nuclei/{{.Workspace}}-nuclei.html
+- {{.Output}}/vuln/active/jaeles-summary.txt
+- {{.Output}}/vuln/sensitive/jaeles-summary.txt
+
+### 2. Content Discovery Workflow (content-discovery.yaml)
+
+**Description:** Run directory/content discovery scans on HTTP targets
+**Tools Used:**
+- ffuf-mod - Modified ffuf for directory brute forcing
+- junique - JSON unique filtering tool
+- csvtk - CSV toolkit for data processing
+- jq - JSON processor
+
+**Sections:**
+- **name:** content-discovery
+- **desc:** Run dirbscan scan on list of HTTP file
+- **report:** Final beautified results
+- **params:** Threading and wordlist configuration
+- **pre_run:** Directory creation
+- **steps:** Parallel directory scanning with result processing
+
+**Key Parameters:**
+- wordlists: {{.Data}}/wordlists/content/small.txt
+- ffThreads: 30 (threads for single site)
+- dirbThreads: 15 (parallel ffuf instances)
+- dlimit: 50000 (discovery limit)
+- recursion: 0 (recursion depth)
+
+**Generated Reports:**
+- {{.Output}}/directory/beautify-{{.Workspace}}.txt
+
+### 3. Port Scan and Directory Scan Flow (portscan-and-dirbscan-flow.yaml)
+
+**Description:** Combined flow for port scanning followed by directory scanning
+**Type:** sample-flow (modular approach)
+**Validator:** ip-file
+
+**Flow Structure:**
+- **routines:** Sequential execution of modules
+- **modules:** portscan -> dirbscan
+
+### 4. Port Scan Module (sample-flow/portscan.yaml)
+
+**Description:** Comprehensive port scanning on 65k ports
+**Tools Used:**
+- rustscan - Fast port scanner
+- cinfo - Service information gathering
+- httprobe - HTTP service detection
+- metabigor - Nmap integration tool
+- nmap - Network mapper (via metabigor)
+
+**Key Parameters:**
+- ports: 0-65535 (full port range)
+- rateRustScan: 20000 (scan rate)
+- nmapThreads: 40 (Nmap threading)
+- httpThreads: 100 (HTTP probing threads)
+
+**Generated Reports:**
+- {{.Output}}/portscan/open-ports.txt
+- {{.Output}}/portscan/http-running.txt
+- {{.Output}}/portscan/nmap-raw-{{.Workspace}}.txt
+- {{.Output}}/portscan/{{.Workspace}}-aquatone/portscan-{{.Workspace}}.html
+- {{.Output}}/portscan/detail-open-ports.txt
+- {{.Output}}/portscan/ssl-info.txt
+
+### 5. Directory Scan Module (sample-flow/dirbscan.yaml)
+
+**Description:** Directory scanning on discovered HTTP services
+**Tools Used:**
+- ffuf-mod - Directory brute forcing
+- junique - Unique result filtering
+- csvtk - CSV processing
+- jq - JSON processing
+
+**Key Parameters:**
+- httpFile: {{.Output}}/portscan/http-running.txt (input from portscan)
+- wordlists: {{.Data}}/wordlists/content/small.txt
+- ffThreads: 30
+- dirbThreads: 15
+- recursion: 0
+
+## Input File Formats
+
+### 1. inputs-host-only
+**Format:** Plain IP addresses
+**Example:**
+```
+110.45.180.142
+13.114.9.80
+```
+
+### 2. inputs-host-with-port
+**Format:** IP:Port combinations
+**Example:**
+```
+110.45.180.142:443
+13.114.9.80:80
+134.209.25.38:80
+138.68.191.179:8080
+```
+
+### 3. inputs-urls
+**Format:** Full HTTP/HTTPS URLs
+**Example:**
+```
+http://223.202.198.17
+http://39.106.150.150:8090
+https://169.143.0.134
+https://13.112.126.46
+```
+
+## Complete Tool Reference
+
+### Core Security Tools:
+1. **httprobe** - HTTP service detection and probing
+2. **jaeles** - Web application vulnerability scanner with signature-based detection
+3. **nuclei** - Fast and customizable vulnerability scanner with templates
+4. **ffuf-mod** - Modified ffuf for advanced directory/content discovery
+5. **rustscan** - High-speed port scanner written in Rust
+6. **nmap** - Network discovery and security auditing (via metabigor)
+7. **metabigor** - OSINT and reconnaissance framework
+8. **cinfo** - Service information and SSL certificate gathering
+
+### Data Processing Tools:
+1. **jq** - Command-line JSON processor
+2. **junique** - JSON unique filtering utility
+3. **csvtk** - CSV toolkit for data manipulation and processing
+4. **cat** - File content display
+5. **sort** - Text sorting utility
+
+### Built-in Functions and Scripts:
+1. **CreateFolder()** - Directory creation function
+2. **ExecCmd()** - Command execution function
+3. **Cat()** - File content display function
+4. **SortU()** - Sort and unique function
+5. **CleanRustScan()** - RustScan output cleaning
+6. **GenNucleiReport()** - Nuclei HTML report generation
+
+## Advanced Configuration
+
+### Threading Configuration:
+- **jaelesThreads:** Controls Jaeles scan concurrency (default: 100)
+- **nucleiThreads:** Controls Nuclei scan concurrency (default: 200)
+- **ffThreads:** Controls ffuf threads per target (default: 30)
+- **dirbThreads:** Controls parallel ffuf instances (default: 15)
+- **httpThreads:** Controls HTTP probing concurrency (default: 100)
+- **nmapThreads:** Controls Nmap scanning threads (default: 40)
+
+### Rate Limiting:
+- **rateRustScan:** RustScan rate limiting (default: 20000)
+- **limit:** General scan limits (default: 100000)
+- **dlimit:** Directory scan limits (default: 50000)
+- **timeout:** Request timeout settings (varies by tool)
+
+### Filtering and Processing:
+- **Status Codes:** -fc '429,404,400' (filtered codes in ffuf)
+- **Extensions:** -e 'asp,aspx,php,html,htm,jsp,cgi' (file extensions)
+- **Recursion:** Configurable directory traversal depth
+- **Severity:** critical,high,medium,low (Nuclei severity levels)
+
+## Output Structure
+
+### Directory Layout:
+```
+{{.Output}}/
+├── vuln/
+│   ├── active/          # Active vulnerability scan results
+│   ├── sensitive/       # Sensitive information findings
+│   ├── nuclei/         # Nuclei scan results
+│   └── raw/            # Raw scan data
+├── directory/          # Directory discovery results
+├── portscan/           # Port scanning results
+│   └── nmap-raw/       # Raw Nmap outputs
+└── reports/            # Final HTML reports
+```
+
+### Report Types:
+1. **HTML Reports:** Interactive web-based results
+2. **JSON Reports:** Machine-readable structured data
+3. **Text Reports:** Human-readable summaries
+4. **CSV Reports:** Spreadsheet-compatible data
+
+## Security Considerations
+
+### Required Permissions:
+- **Root access** may be required for certain Nmap operations
+- **Sudo without password** for metabigor nmap integration
+- **Write permissions** to output directories
+- **Network access** to target systems
+
+### Rate Limiting:
+- Built-in rate limiting to avoid overwhelming targets
+- Configurable thread limits for responsible scanning
+- Timeout settings to prevent hanging scans
+
+### Data Handling:
+- Sensitive information detection and separate reporting
+- Automatic cleanup of temporary files
+- Structured output for further processing
+
+## Troubleshooting
+
+### Common Issues:
+1. **Binary not found:** Ensure all required tools are installed and in PATH
+2. **Permission denied:** Check file permissions and sudo configuration
+3. **Timeout errors:** Adjust timeout and thread parameters
+4. **Memory issues:** Reduce concurrent threads for resource-constrained systems
+5. **Network errors:** Verify target accessibility and network configuration
+
+### Debug Options:
+- Increase verbosity in individual tools
+- Check intermediate output files
+- Verify input file formats
+- Test with smaller target sets
+
+This comprehensive reference covers all sections, tools, and configurations available in the Osmedeus demo workflows.
